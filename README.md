@@ -1,7 +1,3 @@
-# HIRE-MATRIX
-
-HIRE-MATRIX is an online coding assessment platform built using the MERN stack, designed to streamline technical hiring processes for companies. With HIRE-MATRIX, companies can create coding assessments, invite candidates, and review their performance in real time. Currently, the platform supports coding in JavaScript, with additional languages planned for future releases.
-https://hire-matrix-frontend.vercel.app/
 
 ## Key Features
 
