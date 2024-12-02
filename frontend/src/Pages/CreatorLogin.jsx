@@ -104,7 +104,7 @@ const Login = ({ setisLogin }) => {
         type: "success",
         position: "top-right",
       });
-      navigate("/createTest")
+      navigate("/dash")
     } else {
       toast(resp.message || "Try after Sometime!", {
         type: "error",

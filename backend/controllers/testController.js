@@ -20,6 +20,7 @@ const filterObj = (obj, ...allowedFields) => {
 
 exports.getAllTests = catchAsync(async (req, res, next) => {
   const tests = await Test.find();
+  console.log("getting...")
 
   res.status(200).json({
     status: 'success',
@@ -103,15 +104,18 @@ exports.submitTest = catchAsync(async (req, res, next) => {
 });
 
 exports.createTest = catchAsync(async (req, res, next) => {
+  console.log("creating...")
   const testObj = req.body;
   const key = short.generate();
-  testObj.key = key;
+  // testObj.key = key;
   testObj.createdBy = req.user.id;
+  console.log(testObj)
 
   const newTest = await Test.create(testObj);
   newTest.active = undefined;
 
   await Result.create({
+
     testID: newTest._id,
     testKey: key,
     createdBy: req.user.id,

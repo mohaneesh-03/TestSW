@@ -6,12 +6,12 @@ const testSchema = mongoose.Schema({
     type: String,
     required: [true, 'Please enter a Test name'],
   },
-  email: {
-    type: String,
-    required: [true, 'Please enter an email'],
-    lowercase: true,
-    validate: [validator.isEmail, 'Please enter a valid email'],
-  },
+  // email: {
+  //   type: String,
+  //   required: [true, 'Please enter an email'],
+  //   lowercase: true,
+  //   validate: [validator.isEmail, 'Please enter a valid email'],
+  // },
   company: {
     type: String,
     required: [true, 'Please enter your organisation name'],
@@ -98,11 +98,11 @@ const testSchema = mongoose.Schema({
     type: Number,
     required: [true, 'Please enter test duration'],
   },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'Please enter user id'],
-  },
+  // createdBy: {
+  //   type: mongoose.Schema.Types.ObjectId,
+  //   ref: 'User',
+  //   required: [true, 'Please enter user id'],
+  // },
   active: {
     type: Boolean,
     default: true,

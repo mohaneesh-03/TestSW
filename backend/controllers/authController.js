@@ -5,14 +5,16 @@ const User = require('../models/userModel');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const sendEmail = require('../utils/email');
+const { default: mongoose } = require('mongoose');
 
 const signToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET_KEY, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
+  return jwt.sign({ id }, "Eswar", {
+    expiresIn: 6,
   });
 };
 
 const createSendtoken = (user, statusCode, message, res) => {
+  console.log("reached here")
   const token = signToken(user._id);
 
   const cookieOptions = {
@@ -40,16 +42,25 @@ const createSendtoken = (user, statusCode, message, res) => {
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  const newUser = await User.create({
-    firstName: req.body.firstName,
-    lastName: req.body.lastName,
-    email: req.body.email,
-    password: req.body.password,
-    passwordConfirm: req.body.passwordConfirm,
-  });
+  console.log("got request");
+  console.log(req.body);
+  console.log(mongoose.connection.readyState);
 
-  createSendtoken(newUser, 201, 'User signed up successfully', res);
+  try {
+    const newUser = await User.create({
+      firstName: req.body.firstName,
+      email: req.body.email,
+      password: req.body.password,
+      passwordConfirm: req.body.passwordConfirm,
+    });
+    console.log("abc");
+    createSendtoken(newUser, 201, "User signed up successfully", res);
+  } catch (err) {
+    console.error("Error creating user:", err);
+    return next(err); // Pass the error to your error handler
+  }
 });
+
 
 exports.login = catchAsync(async (req, res, next) => {
   const { email, password } = req.body;

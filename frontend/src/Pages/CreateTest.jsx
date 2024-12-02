@@ -1,6 +1,7 @@
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+
 import { MenuItem, Select, FormControl, InputLabel, Box,
   Button,
   CircularProgress,
@@ -26,7 +27,7 @@ const CreateTest = () => {
   const [questions, setQuestions] = useState([{ id: 0, testcases: [{}], type: "coding" }]);
   const [testData, setTestData] = useState({});
   const [loggedIn, setLoggedIn] = useState(false);
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
+  // const [user, setUser] = useState(JSON.parse(localStorage.getItem("user") || "{}"));
   const [isTestAvailable, setIsTestAvailable] = useState(false);
   const [testStatus, setTestStatus] = useState({});
   const navigate = useNavigate();
@@ -57,67 +58,106 @@ const CreateTest = () => {
 
   const handleSubmitTest = async (e) => {
     e.preventDefault();
-    for (let index = 0; index < questions.length; index++) {
-      if (JSON.stringify(questions[index].testcases) === JSON.stringify([{}])) {
-        toast(`Add testcases for ${questions[index]?.name}`, {
-          theme: "light",
-          type: "error",
-          position: "top-right",
-        });
-        return;
-      }
-    }
-  };
+    // for (let index = 0; index < questions.length; index++) {
+    //   if (JSON.stringify(questions[index].testcases) === JSON.stringify([{}])) {
+    //     toast(`Add testcases for ${questions[index]?.name}`, {
+    //       theme: "light",
+    //       type: "error",
+    //       position: "top-right",
+    //     });
+    //     return;
+    //   }
+    // }
+    const questionsWithoutId = questions.map(({ id, ...rest }) => rest);
 
-  const checkLogin = async () => {
-    if (!localStorage.getItem("user")) {
-      toast("Please Login!", {
+    const questionsWithoutTestcases = questionsWithoutId.map(({ id, testcases, type, ...rest }) => {
+      // Remove testcases only for 'mcq' or 'subjective' types
+      const cleanedQuestion = { ...rest, type };
+      if (type !== "mcq" && type !== "subjective") {
+        cleanedQuestion.testcases = testcases;
+      }
+      return cleanedQuestion;
+    });
+
+    const finaltestdata = { ...testData, Question: questionsWithoutTestcases };
+    // const finaltestdata = {...testData, Question: questions}
+    delete finaltestdata[""];
+
+    console.log(JSON.stringify(finaltestdata))
+
+
+    const response = await fetch("http://localhost:5000/tests/create", {
+      method: "POST",
+      body: JSON.stringify(finaltestdata),
+      headers: {"Content-Type" : "application/json"}
+    });
+    const result = await response.json();
+    if (response.ok) {
+      toast("Test successfully created!", {
         theme: "light",
-        type: "error",
+        type: "success",
         position: "top-right",
       });
-      navigate("/login");
-      return;
-    }
-    const resp = await get(
-      "/results/myResults",
-      {},
-      localStorage.getItem("token")
-    );
-    if (!resp.ok) {
-      toast("Please Login!", {
-        theme: "light",
-        type: "error",
-        position: "top-right",
-      });
-      navigate("/login");
+      console.log(result.data.testId)
+      setTestStatus({ isCreated: true, name: finaltestdata.name, id: result.data.testId });
     } else {
-      if (resp?.data?.results?.length > 0) {
-        setIsTestAvailable(true);
-      }
-      setLoggedIn(true);
+      toast(result.message || "Failed to create test.", {
+        theme: "light",
+        type: "error",
+        position: "top-right",
+      });
     }
   };
 
-  useEffect(() => {
-    checkLogin();
-  }, []);
+  // const checkLogin = async () => {
+  //   if (!localStorage.getItem("user")) {
+  //     toast("Please Login!", {
+  //       theme: "light",
+  //       type: "error",
+  //       position: "top-right",
+  //     });
+  //     navigate("/login");
+  //     return;
+  //   }
+  //   // const resp = await get(
+  //   //   "http://localhost:5000/results/myResults",
+  //   //   {},
+  //   //   localStorage.getItem("token")
+  //   // );
+  //   // if (!resp.ok) {
+  //   //   toast("Please Login!", {
+  //   //     theme: "light",
+  //   //     type: "error",
+  //   //     position: "top-right",
+  //   //   });
+  //   //   navigate("/login");
+  //   // } else {
+  //   //   if (resp?.data?.results?.length > 0) {
+  //   //     setIsTestAvailable(true);
+  //   //   }
+  //   //   setLoggedIn(true);
+  //   // }
+  // };
 
-  if (!loggedIn) {
-    return (
-      <Box
-        sx={{
-          width: "100vw",
-          height: "100vh",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <CircularProgress sx={{ mr: "1rem" }} /> Loading...
-      </Box>
-    );
-  }
+  // useEffect(() => {
+  //   checkLogin();
+  // }, []);
+
+  // if (!loggedIn) {
+  //   return (
+  //     <Box
+  //       sx={{
+  //         width: "100vw",
+  //         height: "100vh",
+  //         display: "flex",
+  //         justifyContent: "center",
+  //         alignItems: "center",
+  //       }}
+  //     >
+  //       <CircularProgress sx={{ mr: "1rem" }} /> Loading...
+  //     </Box>
+  //   );
+  // }
 
   // Rest of the component remains the same...
 
@@ -216,7 +256,7 @@ const CreateTest = () => {
           }}
         >
           <Typography variant="body1" color="initial" fontSize="1.375rem">
-            Welcome, {user.firstName}
+            Welcome
           </Typography>
           {isTestAvailable && (
             <Link to={"/result"}>
@@ -449,8 +489,8 @@ const QuestionForm = ({ question, onDelete, onChange, onSaveTestCases, index }) 
               <TextField
                 fullWidth
                 label="Options (Comma-separated)"
-                value={options || ""}
-                onChange={(e) => handleFieldChange("options", e.target.value)}
+                value={options ? options.join(", ") : ""}
+                onChange={(e) => handleFieldChange("options", e.target.value.split(",").map(item => item.trim()))}
                 required
               />
             </Grid>
@@ -469,9 +509,10 @@ const QuestionForm = ({ question, onDelete, onChange, onSaveTestCases, index }) 
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Suggested Answer (Optional)"
+              label="Keywords"
               value={subjectiveAnswer || ""}
               onChange={(e) => handleFieldChange("subjectiveAnswer", e.target.value)}
+              required
             />
           </Grid>
         )}

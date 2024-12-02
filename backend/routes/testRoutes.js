@@ -18,7 +18,7 @@ router.delete(
 router
   .route('/')
   .get(authController.protect, testController.getAllTests)
-  .post(authController.protect, testController.createTest);
+  .post(testController.createTest);
 
 router
   .route('/:id')

@@ -10,12 +10,16 @@ import CreateTest from "./Pages/CreateTest";
 import CreatorLogin from "./Pages/CreatorLogin";
 import LandingPage from "./Pages/LandingPage";
 import Results from "./Pages/Results";
+import CreatorDashboard from "./Pages/CreatorDashboard";
+import ViewResult from "./Pages/ViewResults"
 
 const Router = () => {
   const router = createBrowserRouter(
     createRoutesFromElements(
       <>
         <Route path="/result" element={<Results />} />
+        <Route path="/tests/:testId/results" element={<ViewResult/>} />
+        <Route path="/dash" element={<CreatorDashboard/>}/>
         <Route path="/createTest" element={<CreateTest />} />
         <Route path="/code" element={<AttemptTest />} />
         <Route path="/login" element={<CreatorLogin />} />

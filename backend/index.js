@@ -1,3 +1,4 @@
+const short = require('short-uuid');
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -100,59 +101,258 @@ app.use(cookieParser());
 app.post('/js', async (req, res, next) => {
   await evaluateCode(req, res);
 });
+
+app.get('/results/get', async (req, res) => {
+  const { testId } = req.query; // Extract testId from the query parameters
+  
+  try {
+    // Find results for the specific testId
+    const results = await Result.find({ testID: testId }).populate('testID');
+    console.log(results)
+    
+    if (!results || results.length === 0) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'No results found for this test.',
+      });
+    }
+
+    // Format results as needed
+    const formattedResults = results.map((result) => {
+      // Accessing the first candidate if there are multiple candidates in the array
+      return result.candidate.map((candidate) => ({
+        name: candidate.name,
+        email: candidate.email,
+        score: candidate.score,
+        submittedAt: result.createdAt,  // Assuming `createdAt` is the submission time for each result
+        testName: result.testID.name,  // The name of the test
+      }));
+    }).flat();
+    console.log(formattedResults)
+
+    res.status(200).json({
+      status: 'success',
+      data: formattedResults,
+    });
+  } catch (error) {
+    console.error('Error fetching results:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+    });
+  }
+});
+
+
+app.get('/tests/get', async (req,res)=>{
+  console.log("getting here")
+  try {
+    // Retrieve all tests from the database
+    const tests = await Test.find();
+
+    if (!tests || tests.length === 0) {
+      return res.status(404).json({
+        status: "fail",
+        message: "No tests found",
+      });
+    }
+    const formattedTests = tests.map((test) => ({
+      ...test.toObject(),
+      createdAt: new Date(test.createdAt).toLocaleString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    }));
+    // Send response with the tests
+    res.status(200).json({
+      status: "success",
+      message: "Tests retrieved successfully",
+      data: formattedTests,
+    });
+  } catch (error) {
+    console.error("Error retrieving tests:", error.message);
+    res.status(500).json({
+      status: "error",
+      message: "Internal server error",
+    });
+  }
+});
 app.post(
   '/submit/test',
   catchAsync(async (req, res) => {
-    const candidate = await Result.findOne({
-      testID: req.body.testID,
-      'candidate.email': req.body.user.email,
+    console.log("submit start")
+    const { user, answers, testID } = req.body;
+    // console.log(req.body)
+
+    // Check if the user has already submitted the test
+    const existingCandidate = await Result.findOne({
+      testID,
+      'candidate.email': user.email,
     });
 
-    if (candidate) {
-      res.status(400).json({
+    if (existingCandidate) {
+      return res.status(400).json({
         status: 'fail',
         message: 'You have already submitted the test',
       });
-      return;
     }
-    const result = req.body.code.map(async (code) => {
-      return await evaluateCode({
-        body: {
-          testId: req.body.testID,
-          questionId: code.questionID,
-          code: code.code,
-        },
-      });
-    });
-    let evaluatedResult = [];
-    await Promise.all(result).then((values) => {
-      evaluatedResult = values;
-    });
-    let userResult = req.body.user;
-    let correctAns = 0;
-    evaluatedResult.forEach((each) => {
-      if (!each.includes(false)) {
-        correctAns = correctAns + 1;
-      }
-    });
-    let score = (correctAns / evaluatedResult.length) * 100;
 
-    userResult.score = score;
-    const newResult = await Result.updateOne(
-      { testID: req.body.testID },
-      { $push: { candidate: userResult } }
+    // Fetch the test and questions
+    const test = await Test.findById(testID).populate('Question');
+    // console.log(test)
+    if (!test) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'Test not found',
+      });
+    }
+
+    const evaluatedAnswers = [];
+    let correctAnswers = 0;
+
+    for (const answer of answers) {
+      const question = test.Question.find((q) => q._id.toString() === answer.questionID);
+      console.log(question)
+
+      if (!question) continue;
+
+      let evaluation = {
+        questionID: question._id,
+        questionType: question.type,
+        isCorrect: false,
+        userAnswer: answer.answer,
+      };
+
+      if (question.type === 'coding') {
+        // Evaluate coding questions
+        // const codeEvaluation = await evaluateCode({
+        //   testId: testID,
+        //   questionId: question._id,
+        //   code: answer.answer,
+        // });
+        // evaluation.isCorrect = codeEvaluation.every((testCase) => testCase === true);
+      } else if (question.type === 'mcq') {
+        // Evaluate MCQ questions
+        evaluation.isCorrect = answer.answer === question.correctAnswer;
+      } else if (question.type === 'subjective') {
+        const keywords = question.subjectiveAnswer.split(' '); // Split keywords by space
+        const answerText = answer.answer.toLowerCase(); // Convert answer to lowercase for case-insensitive comparison
+
+        // Check if all keywords are present in the answer
+        const matchedKeywords = keywords.filter(keyword => answerText.includes(keyword.toLowerCase()));
+        const matchPercentage = (matchedKeywords.length / keywords.length) * 100;
+
+        // Set evaluation score or boolean based on matchPercentage
+        evaluation.isCorrect = matchPercentage >= 70; // For example, consider 70% match as correct
+        evaluation.score = matchPercentage;
+      }
+      console.log(evaluatedAnswers)
+
+      evaluatedAnswers.push(evaluation);
+
+      // Count correct answers for scoring
+      if (evaluation.isCorrect) correctAnswers++;
+    }
+
+    // Calculate the score
+    const totalObjectiveQuestions = evaluatedAnswers.filter(
+      (answer) => answer.questionType !== 'subjective'
+    ).length;
+    const score =
+      totalObjectiveQuestions > 0
+        ? (correctAnswers / totalObjectiveQuestions) * 100
+        : 0;
+
+    // Save the result in the database
+    const newCandidate = {
+      email: user.email,
+      name: user.name,
+      score,
+      evaluatedAnswers,
+    };
+
+    const result = await Result.updateOne(
+      { testID },
+      { $push: { candidate: newCandidate } },
+      { upsert: true }
     );
+
+    // Respond with success
     res.status(200).json({
       status: 'success',
-      message: 'Your Test Submitted Successfully',
-      data: {
-        newResult,
-      },
+      message: 'Test submitted successfully',
+      data: { result },
     });
   })
 );
 app.use('/api/questions', questionRouter);
 app.use('/tests', testRouter);
+
+// app.get('/tests/get', async (req,res)=>{
+//   console.log("getting here")
+//   try {
+//     // Retrieve all tests from the database
+//     const tests = await Test.find();
+
+//     if (!tests || tests.length === 0) {
+//       return res.status(404).json({
+//         status: "fail",
+//         message: "No tests found",
+//       });
+//     }
+//     // Send response with the tests
+//     res.status(200).json({
+//       status: "success",
+//       message: "Tests retrieved successfully",
+//       data: tests,
+//     });
+//   } catch (error) {
+//     console.error("Error retrieving tests:", error.message);
+//     res.status(500).json({
+//       status: "error",
+//       message: "Internal server error",
+//     });
+//   }
+// });
+
+app.post('/tests/create', async (req, res)=>{
+  try {
+    console.log("Creating test...");
+    const testObj = req.body;
+    const key = short.generate();
+    testObj.key = key; // Uncomment if you want to set the key
+    // testObj.createdBy = req.user.id;
+    console.log("Test Object:", testObj);
+
+    const newTest = await Test.create(testObj);
+    newTest.active = undefined;
+
+    await Result.create({
+      testID: newTest._id,
+      testKey: key,
+      // createdBy: req.user.id,
+    });
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Test created successfully!',
+      data: {
+        testId: newTest._id,
+        test: newTest,
+      },
+    });
+  } catch (error) {
+    console.error('Error in /tests/create:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to create test.',
+    });
+  }
+});
 app.use('/results', resultRouter);
 app.use('/users', userRouter);
 app.get('/', (req, res) => {

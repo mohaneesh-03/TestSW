@@ -14,11 +14,11 @@ const resultSchema = new mongoose.Schema({
     required: [true, 'Please enter test key'],
     unique: true,
   },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'Please enter the user ID'],
-  },
+  // createdBy: {
+  //   type: mongoose.Schema.Types.ObjectId,
+  //   ref: 'User',
+  //   required: [true, 'Please enter the user ID'],
+  // },
   candidate: {
     type: [
       {
